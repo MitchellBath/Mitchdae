@@ -8,6 +8,8 @@ import asyncio
 
 dotenv.load_dotenv()
 BOT_TOKEN = os.getenv('BOT_TOKEN')
+GUILD_ID = os.getenv('GUILD_ID')
+guild = discord.Object(id=GUILD_ID)
 
 if not BOT_TOKEN:
     raise ValueError("BOT_TOKEN not found in environment variables. Check your .env file.")
@@ -29,7 +31,7 @@ class MitchdaeBot(commands.Bot):
 
     async def on_ready(self):
         if not self.synced:
-            await self.tree.sync()
+            await self.tree.sync(guild=guild)
             self.synced = True
         print(f"Logged in as {self.user}")
 
