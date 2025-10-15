@@ -302,5 +302,57 @@ async def addchar(interaction: discord.Interaction, name: str, power: int):
 
     await interaction.response.send_message(f"✅ Added character **{name}** with power {power}.", ephemeral=True)
 
+# view chars
+@bot.tree.command(name="mychars", description="View all characters you have claimed.")
+async def mychars(interaction: discord.Interaction):
+    async with aiosqlite.connect("mitchdae.db") as db:
+        # Get user ID
+        async with db.execute("SELECT id FROM users WHERE discord_id = ?;", (interaction.user.id,)) as cursor:
+            user_row = await cursor.fetchone()
+
+        if not user_row:
+            await interaction.response.send_message("You have no characters yet!", ephemeral=True)
+            return
+
+        user_id = user_row[0]
+
+        # Get all characters
+        async with db.execute("""
+            SELECT c.name, c.power
+            FROM characters c
+            JOIN user_characters uc ON uc.character_id = c.id
+            WHERE uc.user_id = ?
+            ORDER BY c.name;
+        """, (user_id,)) as cursor:
+            chars = await cursor.fetchall()
+
+    if not chars:
+        await interaction.response.send_message("You have no characters yet!", ephemeral=True)
+        return
+
+    msg = "\n".join(f"**{name}** (Power {power})" for name, power in chars)
+    await interaction.response.send_message(f"Your characters:\n{msg}", ephemeral=True)
+
+# clear user
+@bot.tree.command(name="deletechars", description="Delete all characters you have claimed.")
+async def deletechars(interaction: discord.Interaction):
+    async with aiosqlite.connect("mitchdae.db") as db:
+        # Get user ID
+        async with db.execute("SELECT id FROM users WHERE discord_id = ?;", (interaction.user.id,)) as cursor:
+            user_row = await cursor.fetchone()
+
+        if not user_row:
+            await interaction.response.send_message("You have no characters to delete.", ephemeral=True)
+            return
+
+        user_id = user_row[0]
+
+        # Delete all characters for this user
+        await db.execute("DELETE FROM user_characters WHERE user_id = ?;", (user_id,))
+        await db.commit()
+
+    await interaction.response.send_message("✅ All your characters have been deleted.", ephemeral=True)
+
+
 
 bot.run(BOT_TOKEN)
