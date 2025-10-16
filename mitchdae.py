@@ -31,7 +31,7 @@ class MitchdaeBot(commands.Bot):
 
     async def on_ready(self):
         if not self.synced:
-            await self.tree.sync(guild=guild)
+            await self.tree.sync()
             self.synced = True
         print(f"Logged in as {self.user}")
 
@@ -285,8 +285,7 @@ async def genChars(adjs, nouns):
 
 
 # Add new characters (admin-only)
-@bot.tree.command(name="addchar", description="Add a new character to the database (admin only).")
-@commands.has_permissions(administrator=True)
+@bot.tree.command(name="addchar", description="Add a new character to the database.")
 async def addchar(interaction: discord.Interaction, name: str, power: int):
     """Adds a character to the database with a power level between 0 and 999."""
     # Check power bounds
