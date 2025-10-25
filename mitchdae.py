@@ -46,7 +46,8 @@ async def setup_db():
         await db.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY,
-            discord_id INTEGER UNIQUE
+            discord_id INTEGER UNIQUE,
+            cash INTEGER DEFAULT 0
         );
         """)
         await db.execute("""
@@ -80,32 +81,30 @@ adjs = [
     "Cuck",
     "Racist",
     "Ultimate",
-    "Melee",
     "Skeleton",
     "Bootlicker",
     "Clanker",
     "Stanker",
-    "Virtual",
     "Deadbeat",
     "Chonky",
     "In 5 Years",
-    "Now",
     "Out Night",
     "Gay",
     "Bad Gay",
     "Good Gay",
     "Bisexual",
+    "Heterosexual",
+    "Straight",
     "LAN Party",
     "Wizard",
     "Trucker",
     "Pregnant",
-    "Villager",
-    "Golem",
+    "Filled",
     "NPC",
     "Chicken Jockey",
     "Shut Up Cracker",
     "Cracker",
-    "Fish",
+    "Fishy",
     "Old Yeller",
     "Godlike",
     "Wimpy",
@@ -124,6 +123,7 @@ nouns = [
     "William",
     "David",
     "Brendan",
+    "Victor"
     "Krusk",
     "Stranger",
     "Bimblore",
@@ -132,8 +132,6 @@ nouns = [
     "Poopshit",
     "Vinkledorf",
     "Chung Pao",
-    "Bhaal Busters",
-    "Gorko",
     "Esrit",
     "Ihsoy",
     "Ri'ik",
@@ -152,14 +150,6 @@ nouns = [
     "Wither Skeleton",
     "Wither",
     "Asian Baby",
-    "Heavy",
-    "Scout",
-    "Demoman",
-    "Soldier",
-    "Medic",
-    "Sniper",
-    "Engineer",
-    "Spy",
     "Coup Game",
     "Drywall"
 ]
@@ -353,6 +343,44 @@ async def deletechars(interaction: discord.Interaction):
         await db.commit()
 
     await interaction.response.send_message("✅ All your characters have been deleted.", ephemeral=True)
+
+
+@bot.tree.command(name="sacrifice", description="turn a character to cash")
+async def sacrifice(interaction: discord.Interaction, character_name: str):
+    async with aiosqlite.connect("mitchdae.db") as db:
+        # 1. Look up the user's internal database ID
+        async with db.execute("SELECT id FROM users WHERE discord_id = ?;", (interaction.user.id,)) as cursor:
+            result = await cursor.fetchone()
+            if not result:
+                await interaction.response.send_message("You don't have any characters yet!")
+                return
+            (user_id,) = result
+
+        # 2. Check if the user owns the specified character
+        async with db.execute("""
+            SELECT c.id, c.power
+            FROM characters c
+            JOIN user_characters uc ON uc.character_id = c.id
+            WHERE uc.user_id = ? AND LOWER(c.name) = LOWER(?);
+        """, (user_id, character_name)) as cursor:
+            row = await cursor.fetchone()
+
+        if not row:
+            await interaction.response.send_message("You do not own that character.")
+            return
+
+        char_id, power = row
+
+        # 3. Remove the character and give the user cash
+        await db.execute("DELETE FROM user_characters WHERE user_id = ? AND character_id = ?;", (user_id, char_id))
+        await db.execute("""
+            INSERT INTO users (discord_id, cash)
+            VALUES (?, ?)
+            ON CONFLICT(discord_id) DO UPDATE SET cash = cash + ?;
+        """, (interaction.user.id, power, power))
+        await db.commit()
+
+    await interaction.response.send_message(f"You sacrificed {character_name} for **{power}** cash.")
 
 
 
