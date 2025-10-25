@@ -164,17 +164,19 @@ nouns = [
 @bot.tree.command(name="roll", description="Roll for a random set of characters.")
 @app_commands.checks.cooldown(3, 3600, key=lambda i: i.user.id)
 async def roll(interaction: discord.Interaction):
+    await interaction.response.defer(thinking=True)
+
     async with aiosqlite.connect("mitchdae.db") as db:
         async with db.execute("SELECT name, power FROM characters ORDER BY RANDOM() LIMIT 3;") as cursor:
             results = await cursor.fetchall()
 
     if not results:
-        await interaction.response.send_message("No characters found in the database.")
+        await interaction.followup.send("No characters found in the database.")
         return
 
     choices = [f"{i+1}. {name} (Power {power})" for i, (name, power) in enumerate(results)]
     msg = "\n".join(choices)
-    await interaction.response.send_message(f"Your roll:\n{msg}\nType the number of the character you want to claim!")
+    await interaction.followup.send(f"Your roll:\n{msg}\nType the number of the character you want to claim!")
 
     def check(m):
         return (
