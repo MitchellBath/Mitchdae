@@ -1,6 +1,7 @@
 import os
 import discord
 from discord.ext import commands
+from dsicord import app_commands
 import random
 import aiosqlite
 import dotenv
@@ -161,6 +162,7 @@ nouns = [
 
 # Roll three random characters
 @bot.tree.command(name="roll", description="Roll for a random set of characters.")
+@app_commands.checks.cooldown(3, 3600, key=lambda i: i.user.id)
 async def roll(interaction: discord.Interaction):
     async with aiosqlite.connect("mitchdae.db") as db:
         async with db.execute("SELECT name, power FROM characters ORDER BY RANDOM() LIMIT 3;") as cursor:
