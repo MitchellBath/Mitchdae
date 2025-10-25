@@ -1,7 +1,7 @@
 import os
 import discord
 from discord.ext import commands
-from dsicord import app_commands
+from discord import app_commands
 import random
 import aiosqlite
 import dotenv
