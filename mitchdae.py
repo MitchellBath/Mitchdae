@@ -345,18 +345,19 @@ async def deletechars(interaction: discord.Interaction):
     await interaction.response.send_message("✅ All your characters have been deleted.", ephemeral=True)
 
 
-@bot.tree.command(name="sacrifice", description="turn a character to cash")
+@bot.tree.command(name="sacrifice", description="Turn a character into cash.")
 async def sacrifice(interaction: discord.Interaction, character_name: str):
+    await interaction.response.defer()
+
     async with aiosqlite.connect("mitchdae.db") as db:
-        # 1. Look up the user's internal database ID
+        # 1. Get the user's ID
         async with db.execute("SELECT id FROM users WHERE discord_id = ?;", (interaction.user.id,)) as cursor:
             result = await cursor.fetchone()
             if not result:
-                await interaction.response.send_message("You don't have any characters yet!")
+                await interaction.followup.send("You don't have any characters yet!")
                 return
             (user_id,) = result
-
-        # 2. Check if the user owns the specified character
+        # 2. Verify they own the character
         async with db.execute("""
             SELECT c.id, c.power
             FROM characters c
@@ -364,23 +365,23 @@ async def sacrifice(interaction: discord.Interaction, character_name: str):
             WHERE uc.user_id = ? AND LOWER(c.name) = LOWER(?);
         """, (user_id, character_name)) as cursor:
             row = await cursor.fetchone()
-
         if not row:
-            await interaction.response.send_message("You do not own that character.")
+            await interaction.followup.send("You do not own that character.")
             return
-
         char_id, power = row
-
-        # 3. Remove the character and give the user cash
+        # 3. Delete the character from the user's inventory
         await db.execute("DELETE FROM user_characters WHERE user_id = ? AND character_id = ?;", (user_id, char_id))
-        await db.execute("""
-            INSERT INTO users (discord_id, cash)
-            VALUES (?, ?)
-            ON CONFLICT(discord_id) DO UPDATE SET cash = cash + ?;
-        """, (interaction.user.id, power, power))
+        # 4. Update or insert the user's cash manually
+        async with db.execute("SELECT cash FROM users WHERE discord_id = ?;", (interaction.user.id,)) as cursor:
+            existing = await cursor.fetchone()
+        if existing is None:
+            await db.execute("INSERT INTO users (discord_id, cash) VALUES (?, ?);", (interaction.user.id, power))
+        else:
+            await db.execute("UPDATE users SET cash = cash + ? WHERE discord_id = ?;", (power, interaction.user.id))
         await db.commit()
 
-    await interaction.response.send_message(f"You sacrificed {character_name} for **{power}** cash.")
+    await interaction.followup.send(f"You sacrificed **{character_name}** for 💰 **{power} Cash**.")
+
 
 
 
