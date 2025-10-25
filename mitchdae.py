@@ -382,7 +382,24 @@ async def sacrifice(interaction: discord.Interaction, character_name: str):
 
     await interaction.followup.send(f"You sacrificed **{character_name}** for 💰 **{power} Cash**.")
 
+@bot.tree.command(name="leaderboard", description="Show the richest players.")
+async def leaderboard(interaction: discord.Interaction):
+    await interaction.response.defer()  # Acknowledge the command immediately
 
+    async with aiosqlite.connect("mitchdae.db") as db:
+        async with db.execute("SELECT discord_id, cash FROM users ORDER BY cash;") as cursor:
+            rows = await cursor.fetchall()
+
+    if not rows:
+        await interaction.followup.send("No leaderboard data found.")
+        return
+
+    msg_lines = []
+    for i, (discord_id, cash) in enumerate(rows, start=1):
+        msg_lines.append(f"**#{i}** <@{discord_id}> — 💰 {cash}")
+
+    msg = "\n".join(msg_lines)
+    await interaction.followup.send(f"🏆 **Leaderboard** 🏆\n{msg}")
 
 
 bot.run(BOT_TOKEN)
