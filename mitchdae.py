@@ -401,15 +401,16 @@ async def leaderboard(interaction: discord.Interaction):
 # Coin flip gambling
 @bot.tree.command(name="coinflip", description="Bet cash on a coin flip.")
 async def coinflip(interaction: discord.Interaction, bet: int):
+    await interaction.response.defer()  # Acknowledge the command immediately
     if bet <= 0:
-        await interaction.response.send_message("Bet must be positive.", ephemeral=True)
+        await interaction.followup.send("Bet must be positive.", ephemeral=True)
         return
 
     async with aiosqlite.connect("mitchdae.db") as db:
         cur = await db.execute("SELECT cash FROM users WHERE discord_id = ?;", (interaction.user.id,))
         row = await cur.fetchone()
         if not row or row[0] < bet:
-            await interaction.response.send_message("You don't have enough cash.", ephemeral=True)
+            await interaction.followup.send("You don't have enough cash.", ephemeral=True)
             return
 
         win = random.choice([True, False])
@@ -423,7 +424,7 @@ async def coinflip(interaction: discord.Interaction, bet: int):
         await db.execute("UPDATE users SET cash = ? WHERE discord_id = ?;", (new_cash, interaction.user.id))
         await db.commit()
 
-    await interaction.response.send_message(msg, ephemeral=True)
+    await interaction.followup.send(msg)
 
 
 bot.run(BOT_TOKEN)
