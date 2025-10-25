@@ -203,7 +203,20 @@ async def roll(interaction: discord.Interaction):
         await interaction.followup.send(f"You claimed **{name}** with Power {power}!")
 
     except Exception:
-        await interaction.followup.send("You didn’t pick in time!")
+        await interaction.followup.send("You didn't pick in time!")
+
+
+@roll.error
+async def roll_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
+    if isinstance(error, app_commands.CommandOnCooldown):
+        # Cooldown error happens before defer(), so respond directly
+        await interaction.response.send_message(
+            f"You're on cooldown! Try again in {int(error.retry_after)} seconds.",
+            ephemeral=True
+        )
+    else:
+        # Log or re-raise unexpected errors
+        raise error
 
 
 # Battle another user
