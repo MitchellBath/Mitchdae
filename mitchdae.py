@@ -21,7 +21,6 @@ intents.message_content = True
 class MitchdaeBot(commands.Bot):
     def __init__(self):
         super().__init__(command_prefix="!", intents=intents)
-        self.synced = False
 
     async def setup_hook(self):
         # This runs before on_ready()
@@ -30,9 +29,7 @@ class MitchdaeBot(commands.Bot):
         print("Database setup complete.")
 
     async def on_ready(self):
-        if not self.synced:
-            await self.tree.sync()
-            self.synced = True
+        await self.tree.sync()
         print(f"Logged in as {self.user}")
 
 bot = MitchdaeBot()
@@ -400,6 +397,33 @@ async def leaderboard(interaction: discord.Interaction):
 
     msg = "\n".join(msg_lines)
     await interaction.followup.send(f"🏆 **Leaderboard** 🏆\n{msg}")
+
+# Coin flip gambling
+@bot.tree.command(name="coinflip", description="Bet cash on a coin flip.")
+async def coinflip(interaction: discord.Interaction, bet: int):
+    if bet <= 0:
+        await interaction.response.send_message("Bet must be positive.", ephemeral=True)
+        return
+
+    async with aiosqlite.connect("mitchdae.db") as db:
+        cur = await db.execute("SELECT cash FROM users WHERE discord_id = ?;", (interaction.user.id,))
+        row = await cur.fetchone()
+        if not row or row[0] < bet:
+            await interaction.response.send_message("You don't have enough cash.", ephemeral=True)
+            return
+
+        win = random.choice([True, False])
+        if win:
+            new_cash = row[0] + bet
+            msg = f"$$$ You flipped heads and **won {bet} cash!**"
+        else:
+            new_cash = row[0] - bet
+            msg = f"You flipped tails and **lost {bet} cash.**"
+
+        await db.execute("UPDATE users SET cash = ? WHERE discord_id = ?;", (new_cash, interaction.user.id))
+        await db.commit()
+
+    await interaction.response.send_message(msg, ephemeral=True)
 
 
 bot.run(BOT_TOKEN)
