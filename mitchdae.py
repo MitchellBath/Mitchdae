@@ -401,7 +401,7 @@ async def leaderboard(interaction: discord.Interaction):
     await interaction.response.defer()  # Acknowledge the command immediately
 
     async with aiosqlite.connect("mitchdae.db") as db:
-        async with db.execute("SELECT discord_id, cash FROM users ORDER BY cash;") as cursor:
+        async with db.execute("SELECT discord_id, cash FROM users ORDER BY cash DESC;") as cursor:
             rows = await cursor.fetchall()
 
     if not rows:
