@@ -420,9 +420,9 @@ from datetime import datetime, timedelta
 TIMEOUT_COST = 20_000
 TIMEOUT_DURATION = timedelta(hours=1)
 
-@bot.tree.command(name="timeout", description="Spend 20,000 cash to timeout a user for 1 hour.")
+@bot.tree.command(name="mitchjail", description="Spend 20,000 cash to timeout a user for 1 hour.")
 @app_commands.describe(member="Member to timeout")
-async def timeout_member(interaction: discord.Interaction, member: discord.Member):
+async def mitchjail(interaction: discord.Interaction, member: discord.Member):
     await interaction.response.defer(ephemeral=True)
 
     payer = interaction.user
@@ -437,13 +437,6 @@ async def timeout_member(interaction: discord.Interaction, member: discord.Membe
         return
     if guild is None:
         await interaction.followup.send("This command must be used in a server.", ephemeral=True)
-        return
-    # Protect server owner and privileged members
-    if member.id == guild.owner_id:
-        await interaction.followup.send("You cannot timeout the server owner.", ephemeral=True)
-        return
-    if member.guild_permissions.administrator or member.guild_permissions.manage_guild or member.guild_permissions.moderate_members:
-        await interaction.followup.send("You cannot timeout that member due to their permissions.", ephemeral=True)
         return
 
     # Check bot permissions
@@ -483,7 +476,7 @@ async def timeout_member(interaction: discord.Interaction, member: discord.Membe
         return
 
     # Announce publicly and confirm to payer
-    announce_msg = f"{member.mention} has been timed out for 1 hour by {payer.mention} for {TIMEOUT_COST} cash."
+    announce_msg = f"{member.mention} has been sent to jail for 1 hour by {payer.mention} for {TIMEOUT_COST} cash."
     # send public announcement to the same channel
     try:
         await interaction.channel.send(announce_msg)
