@@ -415,6 +415,85 @@ async def leaderboard(interaction: discord.Interaction):
     msg = "\n".join(msg_lines)
     await interaction.followup.send(f"🏆 **Leaderboard** 🏆\n{msg}")
 
+from datetime import datetime, timedelta
+
+TIMEOUT_COST = 20_000
+TIMEOUT_DURATION = timedelta(hours=1)
+
+@bot.tree.command(name="timeout", description="Spend 20,000 cash to timeout a user for 1 hour.")
+@app_commands.describe(member="Member to timeout")
+async def timeout_member(interaction: discord.Interaction, member: discord.Member):
+    await interaction.response.defer(ephemeral=True)
+
+    payer = interaction.user
+    guild = interaction.guild
+
+    # Basic sanity checks
+    if member.id == payer.id:
+        await interaction.followup.send("You can't timeout yourself.", ephemeral=True)
+        return
+    if member.bot:
+        await interaction.followup.send("You can't timeout bots.", ephemeral=True)
+        return
+    if guild is None:
+        await interaction.followup.send("This command must be used in a server.", ephemeral=True)
+        return
+    # Protect server owner and privileged members
+    if member.id == guild.owner_id:
+        await interaction.followup.send("You cannot timeout the server owner.", ephemeral=True)
+        return
+    if member.guild_permissions.administrator or member.guild_permissions.manage_guild or member.guild_permissions.moderate_members:
+        await interaction.followup.send("You cannot timeout that member due to their permissions.", ephemeral=True)
+        return
+
+    # Check bot permissions
+    me = guild.me  # bot's Member
+    if not me.guild_permissions.moderate_members:
+        await interaction.followup.send("I need the 'Moderate Members' permission to timeout users.", ephemeral=True)
+        return
+
+    # Role hierarchy: bot must be higher than the target
+    if me.top_role <= member.top_role:
+        await interaction.followup.send("I can't timeout that member because their role is higher or equal to mine.", ephemeral=True)
+        return
+
+    # Check payer balance
+    async with aiosqlite.connect("mitchdae.db") as db:
+        async with db.execute("SELECT cash FROM users WHERE discord_id = ?;", (payer.id,)) as cur:
+            row = await cur.fetchone()
+        balance = row[0] if row else 0
+        if balance < TIMEOUT_COST:
+            await interaction.followup.send(f"You need {TIMEOUT_COST} cash to timeout someone. Your balance: {balance}.", ephemeral=True)
+            return
+
+        # Deduct funds
+        await db.execute("UPDATE users SET cash = cash - ? WHERE discord_id = ?;", (TIMEOUT_COST, payer.id))
+        await db.commit()
+
+    # Apply timeout
+    expires_at = datetime.utcnow() + TIMEOUT_DURATION
+    try:
+        await member.edit(timeout=expires_at)
+    except Exception as e:
+        # In case of API error, refund the payer
+        async with aiosqlite.connect("mitchdae.db") as db:
+            await db.execute("UPDATE users SET cash = cash + ? WHERE discord_id = ?;", (TIMEOUT_COST, payer.id))
+            await db.commit()
+        await interaction.followup.send(f"Failed to apply timeout: {e}. Your money has been refunded.", ephemeral=True)
+        return
+
+    # Announce publicly and confirm to payer
+    announce_msg = f"{member.mention} has been timed out for 1 hour by {payer.mention} for {TIMEOUT_COST} cash."
+    # send public announcement to the same channel
+    try:
+        await interaction.channel.send(announce_msg)
+    except Exception:
+        # fallback to followup if sending in channel fails
+        await interaction.followup.send(announce_msg)
+
+    await interaction.followup.send(f"✅ Success — {member.display_name} will be timed out for 1 hour. You were charged {TIMEOUT_COST} cash.", ephemeral=True)
+
+
 # Coin flip gambling
 @bot.tree.command(name="coinflip", description="Bet cash on a coin flip.")
 async def coinflip(interaction: discord.Interaction, bet: int):
